@@ -66,7 +66,7 @@ class GridWorldEnv():
         self.A = deepcopy(A)
         self.B = deepcopy(B)
         print("B:", B.shape)
-        self.state = np.zeros(24)
+        self.state = np.zeros(120)
         # start at state 3
         self.state[0] = 1
     
@@ -76,7 +76,7 @@ class GridWorldEnv():
         return obs
 
     def reset(self):
-        self.state =np.zeros(24)
+        self.state =np.zeros(120)
         self.state[0] =1 
         obs = utils.sample(np.dot(self.A, self.state))
         return obs
@@ -189,33 +189,28 @@ def start_generative_model(action):
 	module_path = str(path.parent) + '/'
 	sys.path.append(module_path)
 
-	state_mapping = {0: (0,0), 1: (1,0), 2: (2,0), 3: (0,1), 4: (1,1), 5:(2,1), 6: (0,2), 7:(1,2), 8:(2,2)}
-
-	A = np.eye(9)
-
-	labels = [state_mapping[i] for i in range(A.shape[1])]
-
 	# A matrix
-	A = np.eye(24)
+	A = np.eye(120)
 	# plot_likelihood(A)
 
 	# construct B matrix
 
 	P = {}
-	dim_x, dim_y = 8, 3
+	dim_x, dim_y, dim_z = 8, 3,5
 	actions = {'UP':0, 'RIGHT':1, 'DOWN':2, 'LEFT':3, 'STAY':4}
 	state_mapping ={}
 	counter = 0
 
 	for y in range(dim_y):
 		for x in range(dim_x):
-			state_mapping[counter] = ((x,y))
-			counter +=1
+			for z in range (dim_z):
+				state_mapping[counter] = ((x,y,z))
+				counter +=1
 	print(state_mapping)
 
-	for state_index, xy_coordinates in state_mapping.items():
+	for state_index, xyz_coordinates in state_mapping.items():
 	    P[state_index] = {a : [] for a in range(len(actions))}
-	    x, y = xy_coordinates
+	    x, y ,z = xyz_coordinates
 
 	    '''if your y-coordinate is all the way at the top (i.e. y == 0), you stay in the same place -- otherwise you move one upwards (achieved by subtracting 3 from your linear state index'''
 	    P[state_index][actions['UP']] = state_index if y == 0 else state_index - dim_x 
@@ -231,9 +226,12 @@ def start_generative_model(action):
 
 	    ''' Stay in the same place (self explanatory) '''
 	    P[state_index][actions['STAY']] = state_index
+        
+    #
+	print(P)
 
 
-	num_states = 24
+	num_states = 120
 	B = np.zeros([num_states, num_states, len(actions)])
 	for s in range(num_states):
 	    for a in range(len(actions)):
@@ -245,7 +243,7 @@ def start_generative_model(action):
 	env = GridWorldEnv(A,B)
 
 	# setup initial prior beliefs -- uncertain -- completely unknown which state it is in
-	Qs = np.ones(24) * 1/9
+	Qs = np.ones(120) * 1/9
 	# plot_beliefs(Qs)
 
 	# C matrix -- desires
@@ -283,7 +281,9 @@ def start_generative_model(action):
 	# home location
 	home = REWARD_LOCATION
 
-	Qs = [1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+	#Qs = [1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+	Qs= [1.]+[0.]*119
+	print(Qs)
 	cur_pos = list(Qs).index(1)
 	# plt.ion()
 	# fig = plt.figure(figsize = (9,9))
@@ -304,10 +304,10 @@ def start_generative_model(action):
 	# x_cord, y_cord = state_mapping[home]
 	# grid[y_cord,x_cord] = 20
 
-	x_cord, y_cord = state_mapping[cur_pos]
+	x_cord, y_cord,z_cord = state_mapping[cur_pos]
 	x_cord_prev = x_cord
 	y_cord_prev = y_cord
-
+	z_cord_prev = z_cord
 	# grid[y_cord,x_cord] = 13
 
 
@@ -341,7 +341,7 @@ def start_generative_model(action):
 	    except ValueError:
 	    	pass
 
-	    x_cord, y_cord = state_mapping[cur_pos]
+	    x_cord, y_cord,z_cord = state_mapping[cur_pos]
 
 	    if x_cord > x_cord_prev:
 	    	movement = 'right'
