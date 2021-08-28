@@ -1,4 +1,5 @@
 # This is needed (on my machine at least) due to weird python import issues
+from generative_model import REWARD_LOCATION
 import os
 import sys
 from pathlib import Path
@@ -10,83 +11,41 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 
 from pymdp import maths, utils
-from pymdp.maths import \
-    spm_log_single as log_stable  # @NOTE: we use the `spm_log_single` helper function from the `maths` sub-library of pymdp. This is a numerically stable version of np.log()
+from pymdp.maths import spm_log_single as log_stable # @NOTE: we use the `spm_log_single` helper function from the `maths` sub-library of pymdp. This is a numerically stable version of np.log()
 from pymdp import control
-
-REWARD_LOCATION = 23
-
-state_mapping = {}
-reverse_state_mapping = {}
-counter = 0
-dim_x, dim_y, dim_z = 8, 3, 5
-
-for z in range(dim_z):
-    for y in range(dim_y):
-        for x in range(dim_x):
-            state_mapping[counter] = ((x, y, z))
-            counter += 1
-
-for y in range(len(state_mapping)):
-    x, y, z = state_mapping[y]
-    reverse_state_mapping[(x, y, z)] = y
-
-A = np.eye(9)
-
-labels = [state_mapping[i] for i in range(A.shape[1])]
-
-# print(f'state_mapping: {state_mapping}')
-
-def state_mapping_to_xy(state_num: int):
-    return (state_mapping[state_num][0], state_mapping[state_num][1])
-
-# bar locations
-# bar = (1,0),(3,0),(4,1),(6,1)
-bar = [state_mapping_to_xy(1), state_mapping_to_xy(3), state_mapping_to_xy(12), state_mapping_to_xy(14), ]
-# lake = (4,0),(5,0),(6,0),(1,2),(2,2)
-lake = [state_mapping_to_xy(4), state_mapping_to_xy(5), state_mapping_to_xy(6), state_mapping_to_xy(17),
-        state_mapping_to_xy(18), ]
-# home location
-# home = (7,2)
-home = state_mapping_to_xy(REWARD_LOCATION)
 
 class GridWorldEnv():
 
-    def __init__(self, A, B):
+    def __init__(self,A,B):
         self.A = deepcopy(A)
         self.B = deepcopy(B)
         # print("B:", B.shape)
-        self.state = np.zeros(120)
+        self.state = np.zeros(24)
         # start at state 3
         self.state[0] = 1
 
-    def step(self, a):
-        self.state = np.dot(self.B[:, :, a], self.state)
+    def step(self,a):
+        self.state = np.dot(self.B[:,:,a], self.state)
         obs = utils.sample(np.dot(self.A, self.state))
         return obs
 
     def reset(self):
-        self.state = np.zeros(120)
-        self.state[0] = 1
+        self.state =np.zeros(24)
+        self.state[0] =1 
         obs = utils.sample(np.dot(self.A, self.state))
         return obs
 
-
-def KL_divergence(q, p):
+def KL_divergence(q,p):
     return np.sum(q * (log_stable(q) - log_stable(p)))
 
-
-def compute_free_energy(q, A, B):
+def compute_free_energy(q,A, B):
     return np.sum(q * (log_stable(q) - log_stable(A) - log_stable(B)))
-
 
 def softmax(x):
     return np.exp(x) / np.sum(np.exp(x))
 
-
 def perform_inference(likelihood, prior):
     return softmax(log_stable(likelihood) + log_stable(prior))
-
 
 def evaluate_policy(policy, Qs, A, B, C):
     # initialize expected free energy at 0
@@ -94,17 +53,18 @@ def evaluate_policy(policy, Qs, A, B, C):
 
     # loop over policy
     for t in range(len(policy)):
+
         # get action entailed by the policy at timestep `t`
         u = int(policy[t])
 
         # work out expected state, given the action
-        Qs_pi = B[:, :, u].dot(Qs)
+        Qs_pi = B[:,:,u].dot(Qs)
 
         # work out expected observations, given the action
         Qo_pi = A.dot(Qs_pi)
 
         # get entropy
-        H = - (A * log_stable(A)).sum(axis=0)
+        H = - (A * log_stable(A)).sum(axis = 0)
 
         # get predicted divergence
         # divergence = np.sum(Qo_pi * (log_stable(Qo_pi) - log_stable(C)), axis=0)
@@ -118,8 +78,8 @@ def evaluate_policy(policy, Qs, A, B, C):
 
     return -G
 
-
 def infer_action(Qs, A, B, C, n_actions, policies):
+
     # initialize the negative expected free energy
     neg_G = np.zeros(len(policies))
 
@@ -148,138 +108,116 @@ def infer_action(Qs, A, B, C, n_actions, policies):
 
     return u
 
+def change_reward(C, z, home, bar, lake):
+    # when z = 0, set everything but lake and home to reward 0.5
+    if z == 0:
+        for i in range(len(C)):
+            if i in lake or i == home:
+                pass
+            else:
+                C[i] = 0.5
+    # when z > 0, set home to 1, lake to z*0.05 and bar to z*0.1
+    if z > 0:
+        C[home] = 1.
+        
 
-def plot_pos(fig, axim, cur_pos, bar, lake, home):
-    grid = np.zeros((3, 8))
+    # print(C)
+    return C
 
-    for position in bar:
-        x_cord, y_cord = state_mapping[position]
-        grid[y_cord, x_cord] = 16
 
-    for position in lake:
-        x_cord, y_cord = state_mapping[position]
-        grid[y_cord, x_cord] = 5
-
-    x_cord, y_cord = state_mapping[home]
-    grid[y_cord, x_cord] = 20
-
-    x_cord, y_cord = state_mapping[cur_pos]
-    grid[y_cord, x_cord] = 13
-
-    # fig = plt.figure(figsize = (9,9))
-    # plt.imshow(grid)
-    # plt.show()
-    axim.set_data(grid)
-    fig.canvas.flush_events()
-
-    return x_cord
 
 
 def start_generative_model(action):
-    global bar
+
+    w = 1.
+    print(w)
     path = Path(os.getcwd())
-    # print(path)
+    print(path)
     module_path = str(path.parent) + '/'
     sys.path.append(module_path)
 
+    REWARD_LOCATION = 23
+
+    # bar locations
+    bar = [1, 3, 12, 14]
+    # lake locations
+    lake = [4, 5, 6, 17, 18]
+    # home location
+    home = REWARD_LOCATION
+    # drunk level
+    z = 0
+
     # A matrix
-    A = np.eye(120)
-    # plot_likelihood(A)
+    A = np.eye(24)
 
     # construct B matrix
 
     P = {}
+    dim_x, dim_y = 8, 3
+    actions = {'UP':0, 'RIGHT':1, 'DOWN':2, 'LEFT':3, 'STAY':4}
+    state_mapping = {}
+    counter = 0
 
-    actions = {'UP': 0, 'RIGHT': 1, 'DOWN': 2, 'LEFT': 3, 'STAY': 4}
+    for y in range(dim_y):
+        for x in range(dim_x):
+            state_mapping[counter] = ((x,y))
+            counter +=1
+    print(state_mapping)
 
-    for state_index, xyz_coordinates in state_mapping.items():
-        P[state_index] = {a: [] for a in range(len(actions))}
-        x, y, z = xyz_coordinates
+    labels = [state_mapping[i] for i in range(A.shape[1])]
+
+    for state_index, xy_coordinates in state_mapping.items():
+        P[state_index] = {a : [] for a in range(len(actions))}
+        x, y = xy_coordinates
+
         '''if your y-coordinate is all the way at the top (i.e. y == 0), you stay in the same place -- otherwise you move one upwards (achieved by subtracting 3 from your linear state index'''
-        P[state_index][actions['UP']] = state_index if y == 0 else state_index - dim_x
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['UP']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['UP']] += dim_x * dim_y
+        P[state_index][actions['UP']] = state_index if y == 0 else state_index - dim_x 
+        # if state_mapping[P[state_index][actions['UP']]] == bar and z < 4:
+        #     z += 1
 
         '''f your x-coordinate is all the way to the right (i.e. x == 2), you stay in the same place -- otherwise you move one to the right (achieved by adding 1 to your linear state index)'''
-        P[state_index][actions["RIGHT"]] = state_index if x == (dim_x - 1) else state_index + 1
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['RIGHT']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['RIGHT']] += dim_x * dim_y
+        P[state_index][actions["RIGHT"]] = state_index if x == (dim_x -1) else state_index+1 
+        # if state_mapping[P[state_index][actions['RIGHT']]] == bar and z < 4:
+        #     z += 1
 
         '''if your y-coordinate is all the way at the bottom (i.e. y == 2), you stay in the same place -- otherwise you move one down (achieved by adding 3 to your linear state index)'''
-        P[state_index][actions['DOWN']] = state_index if y == (dim_y - 1) else state_index + dim_x
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['DOWN']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['DOWN']] += dim_x * dim_y
+        P[state_index][actions['DOWN']] = state_index if y == (dim_y -1) else state_index + dim_x 
+        # if state_mapping[P[state_index][actions['DOWN']]] == bar and z < 4:
+        #     z += 1
 
         ''' if your x-coordinate is all the way at the left (i.e. x == 0), you stay at the same place -- otherwise, you move one to the left (achieved by subtracting 1 from your linear state index)'''
-        P[state_index][actions['LEFT']] = state_index if x == 0 else state_index - 1
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['LEFT']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['LEFT']] += dim_x * dim_y
+        P[state_index][actions['LEFT']] = state_index if x == 0 else state_index -1 
+        # if state_mapping[P[state_index][actions['LEFT']]] == bar and z < 4:
+        #     z += 1
 
         ''' Stay in the same place (self explanatory) '''
         P[state_index][actions['STAY']] = state_index
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['STAY']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['STAY']] += dim_x * dim_y
 
     # print(f'P: {P}')
 
-    num_states = 120
+    num_states = 24
     B = np.zeros([num_states, num_states, len(actions)])
     for s in range(num_states):
         for a in range(len(actions)):
             ns = int(P[s][a])
-            x, y, z = state_mapping[ns]
-            #spread some movement chance around if in a drunk state
-            if z > 0:
-                pass
-                B[ns, s, a] = 1 - 0.1*z
-                if x < dim_x-1:
-                    B[ns+1, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] +=0.025*z
+            B[ns, s, a] = 1
 
-                if x != 0:
-                    B[ns-1, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] += 0.025*z
-
-                if y < dim_y-1:
-                    B[ns+dim_x, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] += 0.025*z
-
-                if y != 0:
-                    B[ns-dim_x, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] += 0.025*z
-            else:
-                B[ns, s, a] = 1
-
-    env = GridWorldEnv(A, B)
+    env = GridWorldEnv(A,B)
 
     # setup initial prior beliefs -- uncertain -- completely unknown which state it is in
-    Qs = np.ones(120) * 1 / 9
-    # plot_beliefs(Qs)
+    Qs = np.ones(24) * 1/9
 
     # C matrix -- desires
 
-
     reward_state = state_mapping[REWARD_LOCATION]
-    # print(reward_state)
-
-    C = np.zeros(num_states)
-    C[REWARD_LOCATION] = 1.
-    # print(C)
-    # plot_beliefs(C)
+    ## C is the reward state. Maybe playing around with this value changes where the agent wants to go?
+    # C = np.zeros(num_states)
+    # C[REWARD_LOCATION] = 1. 
 
     # number of time steps
     T = 10
 
-    # n_actions = env.n_control
+    #n_actions = env.n_control
     n_actions = 5
 
     # length of policies we consider
@@ -292,19 +230,24 @@ def start_generative_model(action):
     o = env.reset()
 
     ##############
+    # from matplotlib import animation
 
-    # Qs = [1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-    Qs = [1.] + [0.] * 119
-
+    Qs = [1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
     cur_pos = list(Qs).index(1)
 
-    x_cord, y_cord, z_cord = state_mapping[cur_pos]
+    x_cord, y_cord = state_mapping[cur_pos]
     x_cord_prev = x_cord
     y_cord_prev = y_cord
-    z_cord_prev = z_cord
+
+    ##############
+
 
     # loop over time
     while 1:
+
+        C = np.zeros(num_states)
+        # change reward state based on drunk level
+        C = change_reward(C, z, home, bar, lake)
 
         # infer which action to take
         a = infer_action(Qs, A, B, C, n_actions, policies)
@@ -313,22 +256,19 @@ def start_generative_model(action):
         o = env.step(int(a))
 
         # infer new hidden state (this is the same equation as above but with PyMDP functions)
-        likelihood = A[o, :]
-        prior = B[:, :, int(a)].dot(Qs)
+        likelihood = A[o,:]
+        prior = B[:,:,int(a)].dot(Qs)
 
         Qs = maths.softmax(log_stable(likelihood) + log_stable(prior))
 
         # print(Qs.round(3))
-        try:
-            # print(list(Qs).index(1))
-            cur_pos = list(Qs).index(1)
+      
+        # print(list(Qs).index(1))
+        cur_pos = list(Qs).index(1)
         # print(cur_pos)
         # x_cord = plot_pos(fig, axim, cur_pos, bar, lake, home)
 
-        except ValueError:
-            pass
-
-        x_cord, y_cord, z_cord = state_mapping[cur_pos]
+        x_cord, y_cord = state_mapping[cur_pos]
 
         if x_cord > x_cord_prev:
             movement = 'right'
@@ -343,28 +283,29 @@ def start_generative_model(action):
 
         action.put(movement)
 
-        # print(f'B: {B}')
-        print(f'x_cord, y_cord, z_cord: {x_cord} {y_cord} {z_cord}')
-
+        
         if cur_pos in bar:
-            print("\n\n\nBAR\n\n\n")
+            if z < 4:
+                z += 1
+            # pass
+            # print("\n\n\nBAR\n\n\n")
 
-        # Increase drunkness vector whenever we enter here
+            # Increase drunkness vector whenever we enter here
 
+        print(z)
         if cur_pos == REWARD_LOCATION:
             print('\n\n\nHOME\n\n\n')
             sys.exit()
 
         if cur_pos in lake:
-            print('\n\n\nLake\n\n\n')
-        # break
+            pass
+            # print('\n\n\nLake\n\n\n')
+            # break
 
         x_cord_prev = x_cord
         y_cord_prev = y_cord
 
         # plot_beliefs(Qs, "Beliefs (Qs) at time {}".format(t))
 
-
-
 # if __name__ == '__main__':
-#     generative_model()
+# 	generative_model()

@@ -1,6 +1,7 @@
 from multiprocessing import Process, Queue
 import sys
 
+# from generative_model_old import *
 from generative_model import *
 from game import *
 
@@ -19,6 +20,7 @@ def run_generative_model(action):
 	while threads < sys.maxsize:
 		threads += 1 
 		start_generative_model(action)
+		
 
 def run_game(action):
 	global threads

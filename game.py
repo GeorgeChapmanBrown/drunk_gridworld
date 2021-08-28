@@ -64,7 +64,6 @@ class Game:
 		pass
 
 def start_game(action):
-	print('hi')
 	g = Game()
 	g.introScreen()
 	g.new()

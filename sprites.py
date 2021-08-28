@@ -94,28 +94,28 @@ class Player(pygame.sprite.Sprite):
 		if move == 'left':
 			self.x_change -= PLAYER_SPEED
 			self.facing = 'left'
-			time.sleep(1)
+			time.sleep(0.1)
 
 		elif move == 'right':
 			self.x_change += PLAYER_SPEED
 			self.facing = 'right'
-			time.sleep(1) 
+			time.sleep(0.1) 
 
 		elif move == 'up':
 			self.y_change -= PLAYER_SPEED
 			self.facing = 'up'
-			time.sleep(1)
+			time.sleep(0.1)
 
 		elif move == 'down':
 			self.y_change += PLAYER_SPEED
 			self.facing = 'down'
-			time.sleep(1) 
+			time.sleep(0.1) 
 
 		elif move == 'stay':
 			self.x_change = 0
 			self.y_change = 0
 			self.facing = 'down' 
-			time.sleep(1)
+			time.sleep(0.1)
 
 	def collideBlocks(self, direction):
 		if direction == "x":
@@ -132,17 +132,19 @@ class Player(pygame.sprite.Sprite):
 	def pond(self):
 		self.pond_location = [[448, 64], [544, 64], [640, 64], [160, 256], [256, 256]]
 		if [self.rect.x, self.rect.y] in self.pond_location:
-			print('\n\n\n\n\ndead\n\n\n\n\n')
+			pass
+			# print('\n\n\n\n\ndead\n\n\n\n\n')
 
 	def bar(self):
 		self.bar_location = [[160, 64], [352, 64], [448, 160], [640, 160]]
 		if [self.rect.x, self.rect.y] in self.bar_location:
-			print('\n\n\n\n\ndrunk\n\n\n\n\n')
+			pass
+			# print('\n\n\n\n\ndrunk\n\n\n\n\n')
 
 	def home(self):
 		self.home_location = [[736, 256]]
 		if [self.rect.x, self.rect.y] in self.home_location:
-			print('\n\n\n\n\nhome\n\n\n\n\n')
+			# print('\n\n\n\n\nhome\n\n\n\n\n')
 			pygame.quit()
 			sys.exit()
 
