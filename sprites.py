@@ -94,28 +94,28 @@ class Player(pygame.sprite.Sprite):
 		if move == 'left':
 			self.x_change -= PLAYER_SPEED
 			self.facing = 'left'
-			time.sleep(0.1)
+			# time.sleep(0.1)
 
 		elif move == 'right':
 			self.x_change += PLAYER_SPEED
 			self.facing = 'right'
-			time.sleep(0.1) 
+			# time.sleep(0.1) 
 
 		elif move == 'up':
 			self.y_change -= PLAYER_SPEED
 			self.facing = 'up'
-			time.sleep(0.1)
+			# time.sleep(0.1)
 
 		elif move == 'down':
 			self.y_change += PLAYER_SPEED
 			self.facing = 'down'
-			time.sleep(0.1) 
+			# time.sleep(0.1) 
 
 		elif move == 'stay':
 			self.x_change = 0
 			self.y_change = 0
 			self.facing = 'down' 
-			time.sleep(0.1)
+			# time.sleep(0.1)
 
 	def collideBlocks(self, direction):
 		if direction == "x":

@@ -14,6 +14,8 @@ from pymdp import maths, utils
 from pymdp.maths import spm_log_single as log_stable # @NOTE: we use the `spm_log_single` helper function from the `maths` sub-library of pymdp. This is a numerically stable version of np.log()
 from pymdp import control
 
+from numba import njit, jit
+
 class GridWorldEnv():
 
     def __init__(self,A,B):
@@ -47,6 +49,7 @@ def softmax(x):
 def perform_inference(likelihood, prior):
     return softmax(log_stable(likelihood) + log_stable(prior))
 
+# @jit
 def evaluate_policy(policy, Qs, A, B, C):
     # initialize expected free energy at 0
     G = 0
@@ -78,6 +81,7 @@ def evaluate_policy(policy, Qs, A, B, C):
 
     return -G
 
+# @jit
 def infer_action(Qs, A, B, C, n_actions, policies):
 
     # initialize the negative expected free energy
@@ -106,21 +110,29 @@ def infer_action(Qs, A, B, C, n_actions, policies):
     # sample control from action marginal
     u = utils.sample(Qu)
 
+    # print(u)
+
     return u
 
-def change_reward(C, z, home, bar, lake):
+def change_reward(C, z, home, bar, lake, checkpoint, checkpoint_reached):
     # when z = 0, set everything but lake and home to reward 0.5
     if z == 0:
         for i in range(len(C)):
             if i in lake or i == home:
                 pass
             else:
-                C[i] = 0.5
+                C[i] = 1
     # when z > 0, set home to 1, lake to z*0.05 and bar to z*0.1
     if z > 0:
+        for i in range(len(C)):
+            if i in lake:
+                pass
+            else:
+                C[i] = 0.1 
         C[home] = 1.
+        if checkpoint_reached == False:
+            C[checkpoint] = 1.
         
-
     # print(C)
     return C
 
@@ -130,13 +142,14 @@ def change_reward(C, z, home, bar, lake):
 def start_generative_model(action):
 
     w = 1.
-    print(w)
+    # print(w)
     path = Path(os.getcwd())
-    print(path)
+    # print(path)
     module_path = str(path.parent) + '/'
     sys.path.append(module_path)
 
     REWARD_LOCATION = 23
+    CHECKPOINT_LOCATION = 11
 
     # bar locations
     bar = [1, 3, 12, 14]
@@ -144,6 +157,9 @@ def start_generative_model(action):
     lake = [4, 5, 6, 17, 18]
     # home location
     home = REWARD_LOCATION
+    # checkpoint location
+    checkpoint = CHECKPOINT_LOCATION
+    checkpoint_reached = False
     # drunk level
     z = 0
 
@@ -221,11 +237,10 @@ def start_generative_model(action):
     n_actions = 5
 
     # length of policies we consider
-    policy_len = 4
+    policy_len = 5
 
     # this function generates all possible combinations of policies
     policies = control.construct_policies([B.shape[0]], [n_actions], policy_len)
-
     # reset environment
     o = env.reset()
 
@@ -247,11 +262,10 @@ def start_generative_model(action):
 
         C = np.zeros(num_states)
         # change reward state based on drunk level
-        C = change_reward(C, z, home, bar, lake)
+        C = change_reward(C, z, home, bar, lake, checkpoint, checkpoint_reached)
 
         # infer which action to take
         a = infer_action(Qs, A, B, C, n_actions, policies)
-
         # perform action in the environment and update the environment
         o = env.step(int(a))
 
@@ -292,8 +306,8 @@ def start_generative_model(action):
 
             # Increase drunkness vector whenever we enter here
 
-        print(z)
-        if cur_pos == REWARD_LOCATION:
+        # print(z)
+        if cur_pos == home:
             print('\n\n\nHOME\n\n\n')
             sys.exit()
 
@@ -301,6 +315,12 @@ def start_generative_model(action):
             pass
             # print('\n\n\nLake\n\n\n')
             # break
+        
+        if cur_pos == checkpoint:
+            checkpoint_reached = True
+
+        if checkpoint_reached == True and x_cord < 3:
+            checkpoint_reached == False
 
         x_cord_prev = x_cord
         y_cord_prev = y_cord
