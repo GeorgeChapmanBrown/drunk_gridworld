@@ -35,6 +35,8 @@ class Player(pygame.sprite.Sprite):
 		self.y_change = 0
 
 		self.facing = 'down'
+		self.animation_loop = 0
+		self.drowning = False
 
 		self.image = self.game.character_spritesheet.get_sprite(3, 2, self.width, self.height, 0)
 
@@ -51,6 +53,7 @@ class Player(pygame.sprite.Sprite):
 		self.collideBlocks('y')
 
 		self.pond()
+		self.animate()
 		self.bar()
 		self.home()
 
@@ -90,7 +93,6 @@ class Player(pygame.sprite.Sprite):
 
 		move = action.get()
 		z = drunk.get()
-		# move = 'right'
 
 		if move == 'left':
 			self.x_change -= PLAYER_SPEED
@@ -98,7 +100,7 @@ class Player(pygame.sprite.Sprite):
 			self.image = self.game.character_spritesheet.get_sprite(3, 98, self.width, self.height, 0)
 			if z > 0:
 				self.image = self.game.drunk_character.get_sprite(3, 98, self.width, self.height, 0)
-			time.sleep(0.5)
+			# time.sleep(0.5)
 
 		elif move == 'right':
 			self.x_change += PLAYER_SPEED
@@ -106,7 +108,7 @@ class Player(pygame.sprite.Sprite):
 			self.image = self.game.character_spritesheet.get_sprite(3, 66, self.width, self.height, 0)
 			if z > 0:
 				self.image = self.game.drunk_character.get_sprite(3, 66, self.width, self.height, 0)
-			time.sleep(0.5)
+			# time.sleep(0.5)
 
 		elif move == 'up':
 			self.y_change -= PLAYER_SPEED
@@ -114,7 +116,7 @@ class Player(pygame.sprite.Sprite):
 			self.image = self.game.character_spritesheet.get_sprite(3, 34, self.width, self.height, 0)
 			if z > 0:
 				self.image = self.game.drunk_character.get_sprite(3, 34, self.width, self.height, 0)
-			time.sleep(0.5)
+			# time.sleep(0.5)
 
 		elif move == 'down':
 			self.y_change += PLAYER_SPEED
@@ -122,7 +124,7 @@ class Player(pygame.sprite.Sprite):
 			self.image = self.game.character_spritesheet.get_sprite(3, 2, self.width, self.height, 0)
 			if z > 0:
 				self.image = self.game.drunk_character_down.get_sprite(0, 0, self.width, self.height, 0)
-			time.sleep(0.5) 
+			# time.sleep(0.5) 
 
 		elif move == 'stay':
 			self.x_change = 0
@@ -145,7 +147,7 @@ class Player(pygame.sprite.Sprite):
 	def pond(self):
 		self.pond_location = [[448, 64], [544, 64], [640, 64], [160, 256], [256, 256]]
 		if [self.rect.x, self.rect.y] in self.pond_location:
-			pass
+			self.drowning = True
 			# print('\n\n\n\n\ndead\n\n\n\n\n')
 
 	def bar(self):
@@ -160,6 +162,20 @@ class Player(pygame.sprite.Sprite):
 			# print('\n\n\n\n\nhome\n\n\n\n\n')
 			pygame.quit()
 			sys.exit()
+
+	def animate(self):
+
+		lake_animation = [self.game.character_spritesheet.get_sprite(133, 80, self.width-3, self.height-8, 0),
+						  self.game.character_spritesheet.get_sprite(165, 80, self.width-2, self.height-4, 0),
+						  self.game.character_spritesheet.get_sprite(197, 79, self.width-3, self.height-4, 0),
+						  pygame.transform.flip(self.game.character_spritesheet.get_sprite(165, 80, self.width-2, self.height-4, 0), True, False)] 
+
+		if self.drowning == True:
+			self.image = lake_animation[math.floor(self.animation_loop)]
+			self.animation_loop += 0.1
+			if self.animation_loop >= 3:
+				self.animation_loop = 0
+
 
 class Block(pygame.sprite.Sprite):
 	def __init__(self, game, x, y):
@@ -255,3 +271,34 @@ class Ground(pygame.sprite.Sprite):
 		self.rect = self.image.get_rect()
 		self.rect.x = self.x
 		self.rect.y = self.y
+
+class Button:
+	def __init__(self, x, y, width, height, fg, bg, content, fontsize):
+		self.font = pygame.font.Font('arial.ttf', fontsize)
+		self.content = content
+		
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+
+		self.fg = fg
+		self.bg = bg
+
+		self.image = pygame.Surface((self.width, self.height))
+		self.image.fill(self.bg)
+		self.rect = self.image.get_rect()
+
+		self.rect.x = self.x
+		self.rect.y = self.y
+
+		self.text = self.font.render(self.content, True, self.fg)
+		self.text_rect = self.tect.get_rect(center=(self.width/2, self.height/2))
+		self.image.blit(self.text, self.text_rect)
+
+	def is_pressed(self, pos, pressed):
+		if self.rect.collidepoint(pos):
+			if pressed[0]:
+				return True
+			return False
+		return False

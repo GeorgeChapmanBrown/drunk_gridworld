@@ -9,6 +9,7 @@ class Game:
 		self.screen = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 		self.clock = pygame.time.Clock()
 		self.running = True
+		self.font = pygame.font.Font('arial.ttf', 32)
 
 		self.drunk_character = Spritesheet("img/drunk_spritesheet.png")
 		self.drunk_character_down = Spritesheet("img/drunk_down.png")
@@ -16,6 +17,7 @@ class Game:
 		self.terrain_spritesheet = Spritesheet("img/terrain.png")
 		self.bar_spritesheet = Spritesheet("img/pokemon.gif")
 		self.house_image = Spritesheet("img/home.png")
+		self.go_background = pygame.image.load("img/gameover.png")
 
 	def createTileMap(self):
 		for i , row in enumerate(tilemap):
@@ -60,10 +62,36 @@ class Game:
 			self.events()
 			self.update(action, drunk)
 			self.draw()
-		self.running = False
 
 	def introScreen(self):
 		pass
+
+	def gameOver(self):
+		text = self.font.render('Game Over', True, WHITE)
+		text_rect = text.get_rect(center=(WIN_WIDTH/2, WIN_HEIGHT/2))
+
+		exit_button = Button(10, WIN_HEIGHT - 60, 120, 50, WHITE, BLACK, 'EXIT', 32)
+
+		for sprite in self.all_sprites:
+			sprite.kill()
+
+		while self.running:
+			for event in pygame.event.get():
+				if event.type == pygame.QUIT:
+					self.running = False
+
+			mouse_pos = pygame.mouse.get_pos()
+			mouse_pressed = pygame.mouse.get_pressed()
+
+			if exit_button.is_pressed(mouse_pos, mouse_pressed):
+				self.running = False
+
+			self.screen.blit(self.go_background, (0,0))
+			self.screen.blit(text, text_rect)
+			self.screen.blit(exit_button.image, exit_button.rect)
+			self.clock.tick(FPS)
+			pygame.display.update()
+		
 
 def start_game(action, drunk):
 	g = Game()

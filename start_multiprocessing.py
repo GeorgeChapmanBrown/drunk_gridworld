@@ -1,8 +1,8 @@
 from multiprocessing import Process, Queue
 import sys
 
-# from generative_model_old import *
-from generative_model import *
+from generative_model_old import *
+# from generative_model import *
 from game import *
 
 threads = 0

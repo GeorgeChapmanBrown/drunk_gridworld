@@ -14,6 +14,8 @@ from pymdp.maths import \
     spm_log_single as log_stable  # @NOTE: we use the `spm_log_single` helper function from the `maths` sub-library of pymdp. This is a numerically stable version of np.log()
 from pymdp import control
 
+from numba import njit
+
 REWARD_LOCATION = 23
 
 state_mapping = {}
@@ -49,6 +51,22 @@ lake = [state_mapping_to_xy(4), state_mapping_to_xy(5), state_mapping_to_xy(6), 
 # home location
 # home = (7,2)
 home = state_mapping_to_xy(REWARD_LOCATION)
+# checkpoint location
+# CHECKPOINT_LOCATION = [10, 20] 
+checkpoint = [state_mapping_to_xy(10), state_mapping_to_xy(20), ]
+checkpoint_reached_one = False
+checkpoint_reached_two = False
+
+bar_loc = np.array([1, 3, 12, 14])
+lake_loc = np.array([4, 5, 6, 17])
+home_loc = np.array([23])
+checkpoint_loc = np.array([10, 20])
+
+for i in range(dim_z-1):
+    bar_loc = np.concatenate((bar_loc, bar_loc[i*4:(i+1)*4] + (dim_x*dim_y)))
+    lake_loc = np.concatenate((lake_loc, lake_loc[i*4:(i+1)*4] + (dim_x*dim_y)))
+    home_loc = np.concatenate((home_loc, home_loc[i:i+1] + (dim_x*dim_y)))
+    checkpoint_loc = np.concatenate((checkpoint_loc, checkpoint_loc[i*2:(i+1)*2] + (dim_x*dim_y)))
 
 class GridWorldEnv():
 
@@ -119,16 +137,86 @@ def evaluate_policy(policy, Qs, A, B, C):
     return -G
 
 
-def infer_action(Qs, A, B, C, n_actions, policies):
+# def infer_action(Qs, A, B, C, n_actions, policies):
+#     # initialize the negative expected free energy
+#     neg_G = np.zeros(len(policies))
+
+#     # loop over every possible policy and compute the EFE of each policy
+#     for i, policy in enumerate(policies):
+#         neg_G[i] = evaluate_policy(policy, Qs, A, B, C)
+
+#     # get distribution over policies
+#     Q_pi = maths.softmax(neg_G)
+
+#     # initialize probabilites of control states (convert from policies to actions)
+#     Qu = np.zeros(n_actions)
+
+#     # sum probabilites of control states or actions 
+#     for i, policy in enumerate(policies):
+#         # control state specified by policy
+#         u = int(policy[0])
+#         # add probability of policy
+#         Qu[u] += Q_pi[i]
+
+#     # normalize action marginal
+#     utils.norm_dist(Qu)
+
+#     # sample control from action marginal
+#     u = utils.sample(Qu)
+
+#     return u
+
+@njit
+def infer_action(Qs, A, B, C, n_actions, policies, move):
+
     # initialize the negative expected free energy
     neg_G = np.zeros(len(policies))
-
     # loop over every possible policy and compute the EFE of each policy
+    # This is where it slows down
+    # for i, policy in enumerate(policies):
+    #     neg_G[i] = evaluate_policy(policy, Qs, A, B, C)
+
     for i, policy in enumerate(policies):
-        neg_G[i] = evaluate_policy(policy, Qs, A, B, C)
+
+        G = 0
+        # small epsilon value for np.log to make it stable
+        EPS_VAL = 1e-16
+
+        # loop over policy
+        for t in range(len(policy)):
+
+            # get action entailed by the policy at timestep `t`
+            # u = int(policy[t])
+            u = policy[t][0]
+            # work out expected state, given the action
+            cont_B = np.ascontiguousarray(B[:,:,u])
+            Qs_pi = np.dot(cont_B, Qs)
+            # Qs_pi = B[:,:,u].dot(Qs)
+            # work out expected observations, given the action
+            Qo_pi = np.dot(A, Qs_pi)
+            # Qo_pi = A.dot(Qs_pi)
+            # get entropy
+            # H = - (A * log_stable(A)).sum(axis = 0)
+            H = - np.sum(A * np.log(A + EPS_VAL), axis=0)
+            # get predicted divergence
+            # divergence = np.sum(Qo_pi * (log_stable(Qo_pi) - log_stable(C)), axis=0)
+            divergence = np.sum(Qo_pi * (np.log(Qo_pi + EPS_VAL) - np.log(C + EPS_VAL)))
+            # divergence = KL_divergence(Qo_pi, C)
+            # compute the expected uncertainty or ambiguity 
+            uncertainty = np.dot(H, Qs_pi)
+            # uncertainty = H.dot(Qs_pi)
+            # increment the expected free energy counter for the policy, using the expected free energy at this timestep
+            G = G + (divergence + uncertainty)
+
+        neg_G[i] = -G
 
     # get distribution over policies
-    Q_pi = maths.softmax(neg_G)
+    # Q_pi = maths.softmax(neg_G)
+
+    # output = neg_G - neg_G.max(axis=0)
+    # output = np.exp(output)
+    # Q_pi = output / np.sum(output, axis=0)
+    Q_pi = np.exp(neg_G) / np.sum(np.exp(neg_G))
 
     # initialize probabilites of control states (convert from policies to actions)
     Qu = np.zeros(n_actions)
@@ -136,47 +224,59 @@ def infer_action(Qs, A, B, C, n_actions, policies):
     # sum probabilites of control states or actions 
     for i, policy in enumerate(policies):
         # control state specified by policy
-        u = int(policy[0])
+        # u = int(policy[0])
+        u = policy[t][0]
         # add probability of policy
         Qu[u] += Q_pi[i]
 
     # normalize action marginal
-    utils.norm_dist(Qu)
+    # utils.norm_dist(Qu)
+
+    # if Qu.ndim == 3:
+    #     new_dist = np.zeros_like(Qu)
+    #     for c in range(Qu.shape[2]):
+    #         new_dist[:, :, c] = np.divide(Qu[:, :, c], np.sum(Qu[:, :, c], axis=0))
+    #     Qu = new_dist
+    # else:
+    Qu = np.divide(Qu, np.sum(Qu, axis=0))
 
     # sample control from action marginal
-    u = utils.sample(Qu)
+    # u = utils.sample(Qu)
+    sample_onehot = np.random.multinomial(1, Qu)
+    move[0] = np.where(sample_onehot == 1)[0][0]
 
-    return u
+    # return u
 
+def change_reward(C, z, home_loc, bar_loc, lake_loc, checkpoint_loc, checkpoint_reached_one, checkpoint_reached_two):
+    if z == 0:
+        for i in range(len(C)):
+            if i in lake_loc or i in home_loc:
+                pass
+            else:
+                C[i] = 1.
+    # when z > 0, set home to 1, lake to z*0.05 and bar to z*0.1
+    if z > 0:
+        for i in range(len(C)):
+            if i in lake_loc:
+                pass
+            else:
+                C[i] = 0.1 
+            if i in home_loc:
+                C[i] = 1.
+        if checkpoint_reached_one == False:
+            for i in range(len(checkpoint_loc)):
+                if i % 2 == 0:
+                    C[checkpoint_loc[i]] = 1.
+        if checkpoint_reached_two == False:
+            for i in range(len(checkpoint_loc)):
+                if i % 2 == 1:
+                    C[checkpoint_loc[i]] = 1.
+        
+    return C
 
-def plot_pos(fig, axim, cur_pos, bar, lake, home):
-    grid = np.zeros((3, 8))
-
-    for position in bar:
-        x_cord, y_cord = state_mapping[position]
-        grid[y_cord, x_cord] = 16
-
-    for position in lake:
-        x_cord, y_cord = state_mapping[position]
-        grid[y_cord, x_cord] = 5
-
-    x_cord, y_cord = state_mapping[home]
-    grid[y_cord, x_cord] = 20
-
-    x_cord, y_cord = state_mapping[cur_pos]
-    grid[y_cord, x_cord] = 13
-
-    # fig = plt.figure(figsize = (9,9))
-    # plt.imshow(grid)
-    # plt.show()
-    axim.set_data(grid)
-    fig.canvas.flush_events()
-
-    return x_cord
-
-
-def start_generative_model(action):
-    global bar
+def start_generative_model(action, drunk):
+    global bar, bar_loc, home, home_loc, lake, lake_loc, checkpoint, checkpoint_loc, \
+         checkpoint_reached_one, checkpoint_reached_two
     path = Path(os.getcwd())
     # print(path)
     module_path = str(path.parent) + '/'
@@ -222,8 +322,8 @@ def start_generative_model(action):
         ''' Stay in the same place (self explanatory) '''
         P[state_index][actions['STAY']] = state_index
         new_x, new_y, new_z = state_mapping[P[state_index][actions['STAY']]]
-        if (new_x, new_y,) in bar and new_z < 4:
-            P[state_index][actions['STAY']] += dim_x * dim_y
+        # if (new_x, new_y,) in bar and new_z < 4:
+        #     P[state_index][actions['STAY']] += dim_x * dim_y
 
     # print(f'P: {P}')
     drunkState = state_mapping_to_xy(4)
@@ -255,8 +355,6 @@ def start_generative_model(action):
     reward_state = state_mapping[REWARD_LOCATION]
     # print(reward_state)
 
-    C = np.zeros(num_states)
-    C[REWARD_LOCATION] = 1.
     # print(C)
     # plot_beliefs(C)
 
@@ -267,7 +365,7 @@ def start_generative_model(action):
     n_actions = 5
 
     # length of policies we consider
-    policy_len = 3
+    policy_len = 5
 
     # this function generates all possible combinations of policies
     policies = control.construct_policies([B.shape[0]], [n_actions], policy_len)
@@ -278,7 +376,7 @@ def start_generative_model(action):
     ##############
 
     # Qs = [1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-    Qs = [1.] + [0.] * 119
+    Qs = np.array([1.] + [0.] * 119)
 
     cur_pos = list(Qs).index(1)
 
@@ -287,12 +385,19 @@ def start_generative_model(action):
     y_cord_prev = y_cord
     z_cord_prev = z_cord
 
+    move = [0]
+    # C = np.zeros(num_states)
+    # C = change_reward(C, z_cord, home, bar, lake, checkpoint, checkpoint_reached_one, checkpoint_reached_two, state_mapping)
+
     # loop over time
     while 1:
 
+        C = np.zeros(num_states)
+        # change reward state based on drunk level
+        C = change_reward(C, z_cord, home_loc, bar_loc, lake_loc, checkpoint_loc, checkpoint_reached_one, checkpoint_reached_two)
         # infer which action to take
-        a = infer_action(Qs, A, B, C, n_actions, policies)
-
+        infer_action(Qs, A, B, C, n_actions, policies, move)
+        a = move[0]
         # perform action in the environment and update the environment
         o = env.step(int(a))
 
@@ -332,15 +437,28 @@ def start_generative_model(action):
         if cur_pos in bar:
             print("\n\n\nBAR\n\n\n")
 
+        drunk.put(z_cord)
         # Increase drunkness vector whenever we enter here
 
-        if cur_pos == REWARD_LOCATION:
+        if cur_pos == home:
             print('\n\n\nHOME\n\n\n')
             sys.exit()
 
         if cur_pos in lake:
             print('\n\n\nLake\n\n\n')
         # break
+
+        if cur_pos == checkpoint[0]:
+            checkpoint_reached_one = True
+
+        if cur_pos == checkpoint[1]:
+            checkpoint_reached_two = True
+
+        if checkpoint_reached_one == True and x_cord < 2:
+            checkpoint_reached_one = False
+
+        if checkpoint_reached_two == True and x_cord < 4:
+            checkpoint_reached_two = False
 
         x_cord_prev = x_cord
         y_cord_prev = y_cord

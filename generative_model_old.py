@@ -181,57 +181,28 @@ def change_reward(C, z, home, bar, lake, checkpoint, checkpoint_reached_one, che
         if checkpoint_reached_two == False:
             C[checkpoint[1]] = 1.
         
-    print(C)
+    # print(C)
     return C
 
-# def randomizer(z):
-#     return random.randint(1,5) > 5-z
+def randomizer(z):
+    return random.randint(1,5) > 5-z
 
-# def random_move(z):
-#     return random.randint(0,4)
+def random_move():
+    return random.randint(0,4)
 
-# def drunk_movement(prev_pos, x_cord, y_cord, z):
-#     if z == 0:
-#         # Leave the same
-#         pass
-#     elif z == 1:
-#         # randomizer with number being greater than 4
-#         result = randomizer(z)
-#     elif z == 2:
-#         # randomizer with number being greater than 3
-#         result = randomizer(z)
-#     elif z == 3:
-#         # randomizer with number being greater than 2
-#         result = randomizer(z)
-#     elif z == 4:
-#         # randomizer with number being greater than 1
-#         result = randomizer(z)
+def drunk_movement(z, a):
+    result = randomizer(z)
 
-#     if result is True:
-#         #move to random (0,4)
-#         prev_pos
-
+    if result is True:
+        #move to random (0,4)
+        stagger = random_move()
     
+    else:
+        stagger = a
 
-#     return x_cord, y_cord
-
-# @cuda.jit
-def increment_a_2D_array(an_array):
-    x, y = cuda.grid(2)
-    if x < an_array.shape[0] and y < an_array.shape[1]:
-       an_array[x, y] += 1
-
+    return stagger
 
 def start_generative_model(action, drunk):
-    
-    # threadsperblock = (16, 16)
-    # blockspergrid_x = (N + threadsperblock[0] - 1) / threadsperblock[0]
-    # blockspergrid_y = (N + threadsperblock[1] - 1) / threadsperblock[1]
-    # blockspergrid = (blockspergrid_x, blockspergrid_y)
-    # increment_a_2D_array[blockspergrid, threadsperblock](an_array)
-
-    
-    # infer_action_gpu = cuda.jit([f8[:], f8[:], f8[:], f8[:], i4, f8[:], f8[:] ], device=True)(infer_action)
 
     w = 1.
     # print(w)
@@ -281,23 +252,23 @@ def start_generative_model(action, drunk):
 
         '''if your y-coordinate is all the way at the top (i.e. y == 0), you stay in the same place -- otherwise you move one upwards (achieved by subtracting 3 from your linear state index'''
         P[state_index][actions['UP']] = state_index if y == 0 else state_index - dim_x 
-        if state_mapping[P[state_index][actions['UP']]] == bar and z < 4:
-            z += 1
+        # if state_mapping[P[state_index][actions['UP']]] == bar and z < 4:
+        #     z += 1
 
         '''f your x-coordinate is all the way to the right (i.e. x == 2), you stay in the same place -- otherwise you move one to the right (achieved by adding 1 to your linear state index)'''
         P[state_index][actions["RIGHT"]] = state_index if x == (dim_x -1) else state_index+1 
-        if state_mapping[P[state_index][actions['RIGHT']]] == bar and z < 4:
-            z += 1
+        # if state_mapping[P[state_index][actions['RIGHT']]] == bar and z < 4:
+        #     z += 1
 
         '''if your y-coordinate is all the way at the bottom (i.e. y == 2), you stay in the same place -- otherwise you move one down (achieved by adding 3 to your linear state index)'''
         P[state_index][actions['DOWN']] = state_index if y == (dim_y -1) else state_index + dim_x 
-        if state_mapping[P[state_index][actions['DOWN']]] == bar and z < 4:
-            z += 1
+        # if state_mapping[P[state_index][actions['DOWN']]] == bar and z < 4:
+        #     z += 1
 
         ''' if your x-coordinate is all the way at the left (i.e. x == 0), you stay at the same place -- otherwise, you move one to the left (achieved by subtracting 1 from your linear state index)'''
         P[state_index][actions['LEFT']] = state_index if x == 0 else state_index -1 
-        if state_mapping[P[state_index][actions['LEFT']]] == bar and z < 4:
-            z += 1
+        # if state_mapping[P[state_index][actions['LEFT']]] == bar and z < 4:
+        #     z += 1
 
         ''' Stay in the same place (self explanatory) '''
         P[state_index][actions['STAY']] = state_index
@@ -371,9 +342,9 @@ def start_generative_model(action, drunk):
     C = np.zeros(num_states)
         # change reward state based on drunk level
     C = change_reward(C, z, home, bar, lake, checkpoint, checkpoint_reached_one, checkpoint_reached_two)
-    start = timer()
+    # start = timer()
     infer_action(Qs, A, B, C, n_actions, policies, move)
-    print(timer()-start)
+    # print(timer()-start)
 
     # loop over time
     while 1:
@@ -384,12 +355,19 @@ def start_generative_model(action, drunk):
         # change reward state based on drunk level
         C = change_reward(C, z, home, bar, lake, checkpoint, checkpoint_reached_one, checkpoint_reached_two)
         # infer which action to take
-        start = timer()
+        # start = timer()
         infer_action(Qs, A, B, C, n_actions, policies, move)
         # infer_action_gpu(Qs, A, B, C, n_actions, policies, move)
-        print(timer()-start)
+        # print(timer()-start)
         a = move[0]
+        print(f'a: {a}')
         # perform action in the environment and update the environment
+
+        # do stagger calculation
+        if z > 0:
+            a = drunk_movement(z, a)
+            print(f'a_stagger: {a}')
+
         o = env.step(int(a))
 
         # infer new hidden state (this is the same equation as above but with PyMDP functions)
@@ -409,9 +387,7 @@ def start_generative_model(action, drunk):
 
         x_cord, y_cord = state_mapping[cur_pos]
 
-        # x_cord, y_cord = drunk_movement(prev_pos, x_cord, y_cord, z)
-
-        prev_pos = cur_pos
+        print(f'(x_cord, y_cord, z): ({x_cord}, {y_cord}, {z})')
 
         if x_cord > x_cord_prev:
             movement = 'right'
@@ -426,10 +402,18 @@ def start_generative_model(action, drunk):
 
         action.put(movement)
 
-        
         if cur_pos in bar:
             if z < 4:
                 z += 1
+
+            for i, bar_loc in enumerate(bar):
+                if cur_pos == bar_loc:
+                    print(bar_loc)
+                    bar = np.delete(bar, i)
+                else:
+                    pass
+            print(bar)
+
             # pass
             # print("\n\n\nBAR\n\n\n")
 
@@ -443,9 +427,9 @@ def start_generative_model(action, drunk):
             sys.exit()
 
         if cur_pos in lake:
-            time.sleep(100000)
-            # print('\n\n\nLake\n\n\n')
-            # break
+            # time.sleep(100000)
+            print('\n\n\nLake\n\n\n')
+            sys.exit()
         
         if cur_pos == checkpoint[0]:
             checkpoint_reached_one = True
