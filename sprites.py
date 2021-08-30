@@ -44,9 +44,13 @@ class Player(pygame.sprite.Sprite):
 		self.rect.x = self.x
 		self.rect.y = self.y
 
+		self.current_drunk = 0
+		self.maximum_drunk = 4
+		self.drunk_bar_length = 416
+		self.drunk_ratio = self.maximum_drunk / self.drunk_bar_length
+
 	def update(self, action, drunk):
 		self.movement(action, drunk)
-
 		self.rect.x += self.x_change
 		self.collideBlocks('x')
 		self.rect.y += self.y_change
@@ -56,6 +60,9 @@ class Player(pygame.sprite.Sprite):
 		self.animate()
 		self.bar()
 		self.home()
+
+		DrunkBar(self.game, self.current_drunk/self.drunk_ratio, 25, (10,15), SALMON, 0, DRUNK_LAYER_2)
+		DrunkBar(self.game, self.drunk_bar_length+25, 65, (0,0), GREY, 4, DRUNK_LAYER_1)
 
 		self.x_change = 0
 		self.y_change = 0
@@ -90,15 +97,18 @@ class Player(pygame.sprite.Sprite):
 		# 		self.y_change += PLAYER_SPEED
 		# 		self.facing = 'down'
 		# 		time.sleep(0.1)  
-
-		move = action.get()
-		z = drunk.get()
+		try:
+			move = action.get_nowait()
+			self.current_drunk = drunk.get_nowait()
+		except:
+			move = 'stay'
+			pass
 
 		if move == 'left':
 			self.x_change -= PLAYER_SPEED
 			self.facing = 'left'
 			self.image = self.game.character_spritesheet.get_sprite(3, 98, self.width, self.height, 0)
-			if z > 0:
+			if self.current_drunk > 0:
 				self.image = self.game.drunk_character.get_sprite(3, 98, self.width, self.height, 0)
 			# time.sleep(0.5)
 
@@ -106,7 +116,7 @@ class Player(pygame.sprite.Sprite):
 			self.x_change += PLAYER_SPEED
 			self.facing = 'right'
 			self.image = self.game.character_spritesheet.get_sprite(3, 66, self.width, self.height, 0)
-			if z > 0:
+			if self.current_drunk > 0:
 				self.image = self.game.drunk_character.get_sprite(3, 66, self.width, self.height, 0)
 			# time.sleep(0.5)
 
@@ -114,7 +124,7 @@ class Player(pygame.sprite.Sprite):
 			self.y_change -= PLAYER_SPEED
 			self.facing = 'up'
 			self.image = self.game.character_spritesheet.get_sprite(3, 34, self.width, self.height, 0)
-			if z > 0:
+			if self.current_drunk > 0:
 				self.image = self.game.drunk_character.get_sprite(3, 34, self.width, self.height, 0)
 			# time.sleep(0.5)
 
@@ -122,7 +132,7 @@ class Player(pygame.sprite.Sprite):
 			self.y_change += PLAYER_SPEED
 			self.facing = 'down'
 			self.image = self.game.character_spritesheet.get_sprite(3, 2, self.width, self.height, 0)
-			if z > 0:
+			if self.current_drunk > 0:
 				self.image = self.game.drunk_character_down.get_sprite(0, 0, self.width, self.height, 0)
 			# time.sleep(0.5) 
 
@@ -171,11 +181,23 @@ class Player(pygame.sprite.Sprite):
 						  pygame.transform.flip(self.game.character_spritesheet.get_sprite(165, 80, self.width-2, self.height-4, 0), True, False)] 
 
 		if self.drowning == True:
-			self.image = lake_animation[math.floor(self.animation_loop)]
-			self.animation_loop += 0.1
-			if self.animation_loop >= 3:
-				self.animation_loop = 0
+				self.image = lake_animation[math.floor(self.animation_loop)]
+				self.animation_loop += 1
+				time.sleep(0.1)
+				if self.animation_loop >= 4:
+					self.animation_loop = 0
+	
+class DrunkBar(pygame.sprite.Sprite):
+	def __init__(self, game, bar_width, height, center_pos, colour, border, layer):
+		self.game = game
 
+		self.image = pygame.Surface((bar_width, height))
+		self.image.fill((colour))
+		self.rect = self.image.get_rect(center=(center_pos))
+
+		self._layer = layer
+		self.groups = self.game.all_sprites
+		pygame.sprite.Sprite.__init__(self, self.groups)
 
 class Block(pygame.sprite.Sprite):
 	def __init__(self, game, x, y):
