@@ -62,12 +62,13 @@ class Game:
 			self.events()
 			self.update(action, drunk)
 			self.draw()
+		self.gameOver()
 
 	def introScreen(self):
 		pass
 
 	def gameOver(self):
-		text = self.font.render('Game Over', True, WHITE)
+		text = self.font.render('Home Safely!!!', True, WHITE)
 		text_rect = text.get_rect(center=(WIN_WIDTH/2, WIN_HEIGHT/2))
 
 		exit_button = Button(10, WIN_HEIGHT - 60, 120, 50, WHITE, BLACK, 'EXIT', 32)

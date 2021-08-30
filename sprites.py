@@ -158,6 +158,7 @@ class Player(pygame.sprite.Sprite):
 		self.pond_location = [[448, 64], [544, 64], [640, 64], [160, 256], [256, 256]]
 		if [self.rect.x, self.rect.y] in self.pond_location:
 			self.drowning = True
+			# self.game.playing = False
 			# print('\n\n\n\n\ndead\n\n\n\n\n')
 
 	def bar(self):
@@ -170,8 +171,10 @@ class Player(pygame.sprite.Sprite):
 		self.home_location = [[736, 256]]
 		if [self.rect.x, self.rect.y] in self.home_location:
 			# print('\n\n\n\n\nhome\n\n\n\n\n')
-			pygame.quit()
-			sys.exit()
+			time.sleep(5)
+			self.game.playing = False
+			# pygame.quit()
+			# sys.exit()
 
 	def animate(self):
 
@@ -315,7 +318,7 @@ class Button:
 		self.rect.y = self.y
 
 		self.text = self.font.render(self.content, True, self.fg)
-		self.text_rect = self.tect.get_rect(center=(self.width/2, self.height/2))
+		self.text_rect = self.text.get_rect(center=(self.width/2, self.height/2))
 		self.image.blit(self.text, self.text_rect)
 
 	def is_pressed(self, pos, pressed):

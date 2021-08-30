@@ -185,7 +185,7 @@ def change_reward(C, z, home, bar, lake, checkpoint, checkpoint_reached_one, che
     return C
 
 def randomizer(z):
-    return random.randint(1,5) > 5-z
+    return random.randint(1,5) > 6-z
 
 def random_move():
     return random.randint(0,4)
