@@ -197,76 +197,60 @@ def start_generative_model(action):
         x, y, z = xyz_coordinates
         '''if your y-coordinate is all the way at the top (i.e. y == 0), you stay in the same place -- otherwise you move one upwards (achieved by subtracting 3 from your linear state index'''
         P[state_index][actions['UP']] = state_index if y == 0 else state_index - dim_x
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['UP']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['UP']] += dim_x * dim_y
+        new_x, new_y, new_z = state_mapping[P[state_index][actions['UP']]]
+        if (new_x, new_y,) in bar and new_z < 4:
+            P[state_index][actions['UP']] += dim_x * dim_y
 
         '''f your x-coordinate is all the way to the right (i.e. x == 2), you stay in the same place -- otherwise you move one to the right (achieved by adding 1 to your linear state index)'''
         P[state_index][actions["RIGHT"]] = state_index if x == (dim_x - 1) else state_index + 1
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['RIGHT']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['RIGHT']] += dim_x * dim_y
+        new_x, new_y, new_z = state_mapping[P[state_index][actions['RIGHT']]]
+        if (new_x, new_y,) in bar and new_z < 4:
+            P[state_index][actions['RIGHT']] += dim_x * dim_y
 
         '''if your y-coordinate is all the way at the bottom (i.e. y == 2), you stay in the same place -- otherwise you move one down (achieved by adding 3 to your linear state index)'''
         P[state_index][actions['DOWN']] = state_index if y == (dim_y - 1) else state_index + dim_x
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['DOWN']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['DOWN']] += dim_x * dim_y
+        new_x, new_y, new_z = state_mapping[P[state_index][actions['DOWN']]]
+        if (new_x, new_y,) in bar and new_z < 4:
+            P[state_index][actions['DOWN']] += dim_x * dim_y
 
         ''' if your x-coordinate is all the way at the left (i.e. x == 0), you stay at the same place -- otherwise, you move one to the left (achieved by subtracting 1 from your linear state index)'''
         P[state_index][actions['LEFT']] = state_index if x == 0 else state_index - 1
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['LEFT']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['LEFT']] += dim_x * dim_y
+        new_x, new_y, new_z = state_mapping[P[state_index][actions['LEFT']]]
+        if (new_x,new_y,) in bar and new_z < 4:
+            P[state_index][actions['LEFT']] += dim_x * dim_y
 
         ''' Stay in the same place (self explanatory) '''
         P[state_index][actions['STAY']] = state_index
-        # new_x, new_y, new_z = state_mapping[P[state_index][actions['STAY']]]
-        # if (new_x, new_y,) in bar and new_z < 4:
-        #     P[state_index][actions['STAY']] += dim_x * dim_y
+        new_x, new_y, new_z = state_mapping[P[state_index][actions['STAY']]]
+        if (new_x, new_y,) in bar and new_z < 4:
+            P[state_index][actions['STAY']] += dim_x * dim_y
 
     # print(f'P: {P}')
-
+    drunkState = state_mapping_to_xy(4)
     num_states = 120
     B = np.zeros([num_states, num_states, len(actions)])
     for s in range(num_states):
+        x_cord_prev, y_cord_prev, z_cord_prev = state_mapping[s]
         for a in range(len(actions)):
             ns = int(P[s][a])
-            x, y, z = state_mapping[ns]
-            #spread some movement chance around if in a drunk state
-            if z > 0:
-                pass
-                B[ns, s, a] = 1 - 0.1*z
-                if x < dim_x-1:
-                    B[ns+1, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] +=0.025*z
-
-                if x != 0:
-                    B[ns-1, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] += 0.025*z
-
-                if y < dim_y-1:
-                    B[ns+dim_x, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] += 0.025*z
-
-                if y != 0:
-                    B[ns-dim_x, s, a] = 0.025*z
-                else:
-                    B[ns, s, a] += 0.025*z
-            else:
+            #uncomment the else and change the if below to if 'z_cord_prev!=0' to add stagger
+            if z_cord_prev<5:
                 B[ns, s, a] = 1
-
+                '''
+            else:
+                B[ns, s, a] = 1 - 0.1*z_cord_prev
+                for new_choice in actions.values():
+                     if new_choice != a:
+                         print("new choice ="+str(new_choice))
+                         B[int(P[s][new_choice]), s, a]=0.025*z_cord_prev
+                         '''
     env = GridWorldEnv(A, B)
 
     # setup initial prior beliefs -- uncertain -- completely unknown which state it is in
-    Qs = np.ones(120) * 1 / 9
+    Qs = np.ones(120) * 1 / 120
     # plot_beliefs(Qs)
 
     # C matrix -- desires
-
 
     reward_state = state_mapping[REWARD_LOCATION]
     # print(reward_state)
@@ -283,7 +267,7 @@ def start_generative_model(action):
     n_actions = 5
 
     # length of policies we consider
-    policy_len = 4
+    policy_len = 3
 
     # this function generates all possible combinations of policies
     policies = control.construct_policies([B.shape[0]], [n_actions], policy_len)
@@ -317,7 +301,6 @@ def start_generative_model(action):
         prior = B[:, :, int(a)].dot(Qs)
 
         Qs = maths.softmax(log_stable(likelihood) + log_stable(prior))
-
         # print(Qs.round(3))
         try:
             # print(list(Qs).index(1))
@@ -363,7 +346,6 @@ def start_generative_model(action):
         y_cord_prev = y_cord
 
         # plot_beliefs(Qs, "Beliefs (Qs) at time {}".format(t))
-
 
 
 # if __name__ == '__main__':
