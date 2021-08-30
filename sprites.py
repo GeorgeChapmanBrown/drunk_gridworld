@@ -42,8 +42,8 @@ class Player(pygame.sprite.Sprite):
 		self.rect.x = self.x
 		self.rect.y = self.y
 
-	def update(self, action):
-		self.movement(action)
+	def update(self, action, drunk):
+		self.movement(action, drunk)
 
 		self.rect.x += self.x_change
 		self.collideBlocks('x')
@@ -59,7 +59,7 @@ class Player(pygame.sprite.Sprite):
 
 		# print(self.rect.x, self.rect.y)
 
-	def movement(self, action):
+	def movement(self, action, drunk):
 		#add movement here
 		# get from the generative model???
 		# keys = pygame.key.get_pressed()
@@ -89,33 +89,46 @@ class Player(pygame.sprite.Sprite):
 		# 		time.sleep(0.1)  
 
 		move = action.get()
+		z = drunk.get()
 		# move = 'right'
 
 		if move == 'left':
 			self.x_change -= PLAYER_SPEED
 			self.facing = 'left'
-			# time.sleep(0.1)
+			self.image = self.game.character_spritesheet.get_sprite(3, 98, self.width, self.height, 0)
+			if z > 0:
+				self.image = self.game.drunk_character.get_sprite(3, 98, self.width, self.height, 0)
+			time.sleep(0.5)
 
 		elif move == 'right':
 			self.x_change += PLAYER_SPEED
 			self.facing = 'right'
-			# time.sleep(0.1) 
+			self.image = self.game.character_spritesheet.get_sprite(3, 66, self.width, self.height, 0)
+			if z > 0:
+				self.image = self.game.drunk_character.get_sprite(3, 66, self.width, self.height, 0)
+			time.sleep(0.5)
 
 		elif move == 'up':
 			self.y_change -= PLAYER_SPEED
 			self.facing = 'up'
-			# time.sleep(0.1)
+			self.image = self.game.character_spritesheet.get_sprite(3, 34, self.width, self.height, 0)
+			if z > 0:
+				self.image = self.game.drunk_character.get_sprite(3, 34, self.width, self.height, 0)
+			time.sleep(0.5)
 
 		elif move == 'down':
 			self.y_change += PLAYER_SPEED
 			self.facing = 'down'
-			# time.sleep(0.1) 
+			self.image = self.game.character_spritesheet.get_sprite(3, 2, self.width, self.height, 0)
+			if z > 0:
+				self.image = self.game.drunk_character_down.get_sprite(0, 0, self.width, self.height, 0)
+			time.sleep(0.5) 
 
 		elif move == 'stay':
 			self.x_change = 0
 			self.y_change = 0
-			self.facing = 'down' 
-			# time.sleep(0.1)
+			self.facing = 'stay' 
+			# time.sleep(0.5)
 
 	def collideBlocks(self, direction):
 		if direction == "x":
